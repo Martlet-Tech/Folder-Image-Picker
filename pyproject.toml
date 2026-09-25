@@ -1,15 +1,18 @@
 [project]
 name = "folder-image-picker"
 version = "1.0.0"
-description = "ComfyUI node that browses image folders with an inline thumbnail grid, per-node folder memory and recursive subfolder support."
+description = "Browse image folders in an inline thumbnail grid, where every node remembers its own folder. Includes recursive subfolder browsing, breadcrumb navigation, and a modern Windows folder dialog."
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = []
+classifiers = [
+    "Operating System :: OS Independent",
+]
 
 [project.urls]
 Repository = "https://github.com/Martlet-Tech/Folder-Image-Picker"
+"Bug Tracker" = "https://github.com/Martlet-Tech/Folder-Image-Picker/issues"
 
 [tool.comfy]
 PublisherId = "martlet-tech"
 DisplayName = "Folder Image Picker"
-Icon = ""
