@@ -36,7 +36,9 @@ const CSS = `
   background:#141414;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .fip-cell:hover{border-color:#6a9fd4}
 .fip-cell.sel{border-color:#4caf50;box-shadow:0 0 0 1px #4caf50 inset}
-.fip-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.fip-cell .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  filter:blur(14px) saturate(1.2);transform:scale(1.15);opacity:.55;pointer-events:none}
+.fip-cell .fg{position:relative;width:100%;height:100%;object-fit:contain;display:block}
 .fip-cell .nm{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.85));
   color:#fff;font-size:9px;padding:8px 3px 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fip-cell .tick{position:absolute;top:3px;right:3px;background:#4caf50;color:#fff;border-radius:50%;
@@ -359,13 +361,23 @@ class PickerUI {
       cell.dataset.rel = img.rel;
       cell.title = `${img.rel}\n${(img.size / 1024).toFixed(0)} KB`;
 
+      const q = new URLSearchParams({ folder, rel: img.rel });
+      const url = api.apiURL(`/folderpicker/thumb?${q}`);
+
+      const bg = document.createElement("img");
+      bg.className = "bg";
+      bg.alt = "";
+      bg.src = url;
+      bg.onerror = () => bg.remove();
+
       const el = document.createElement("img");
+      el.className = "fg";
       el.loading = "lazy";
       el.decoding = "async";
-      const q = new URLSearchParams({ folder, rel: img.rel });
-      el.src = api.apiURL(`/folderpicker/thumb?${q}`);
+      el.src = url;
       el.onerror = () => {
         el.remove();
+        bg.remove();
         cell.style.color = "#666";
         cell.style.fontSize = "9px";
         cell.textContent = "×";
@@ -375,7 +387,7 @@ class PickerUI {
       nm.className = "nm";
       nm.textContent = img.name;
 
-      cell.append(el, nm);
+      cell.append(bg, el, nm);
       if (img.rel === this.selected) {
         cell.classList.add("sel");
         const t = document.createElement("div");
