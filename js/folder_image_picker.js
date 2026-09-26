@@ -15,9 +15,10 @@ const CSS = `
 .fip-btn:hover{background:#3f3f3f;border-color:#6a6a6a}
 .fip-btn:active{background:#2a2a2a}
 .fip-btn.on{background:#2d5c8a;border-color:#4a8bc2;color:#fff}
-.fip-path{flex:1;min-width:0;background:#141414;border:1px solid #3a3a3a;border-radius:4px;
+.fip-path{background:#141414;border:1px solid #3a3a3a;border-radius:4px;
   padding:4px 7px;color:#8fd18f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-family:Consolas,monospace;font-size:11px}
+  font-family:Consolas,monospace;font-size:11px;direction:rtl;text-align:right}
+.fip-path>span{direction:ltr;unicode-bidi:isolate}
 .fip-path.empty{color:#777;font-style:italic}
 .fip-crumbs{display:flex;gap:4px;align-items:center;flex-wrap:wrap;min-height:18px}
 .fip-crumb{background:#2a2a2a;border:1px solid #444;border-radius:3px;padding:2px 7px;
@@ -29,7 +30,7 @@ const CSS = `
   cursor:pointer;font-size:11px;color:#e0c07a;display:flex;align-items:center;gap:4px}
 .fip-chip:hover{background:#383838;border-color:#6a6a6a}
 .fip-grid{flex:1;overflow-y:auto;display:flex;flex-wrap:wrap;gap:7px;align-content:start;
-  padding:2px;min-height:120px}
+  padding:2px;min-height:120px;position:relative}
 .fip-cell{position:relative;flex:0 0 auto;width:var(--fip-cell,112px);height:var(--fip-cell,112px);
   border:2px solid transparent;border-radius:5px;
   background:#141414;cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center}
@@ -43,6 +44,10 @@ const CSS = `
 .fip-empty{width:100%;text-align:center;color:#777;padding:24px 8px;font-style:italic}
 .fip-status{color:#888;font-size:10px;display:flex;justify-content:space-between;gap:8px}
 .fip-sel{color:#4caf50;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fip-sel.link{cursor:pointer}
+.fip-sel.link:hover{text-decoration:underline}
+.fip-cell.flash{animation:fip-flash 1.2s ease}
+@keyframes fip-flash{0%{box-shadow:0 0 0 8px rgba(76,175,80,.65)}100%{box-shadow:0 0 0 0 rgba(76,175,80,0)}}
 `;
 
 let styleInjected = false;
@@ -73,6 +78,8 @@ class PickerUI {
     this.loading = false;
     this.cellSize = DEFAULT_CELL;
     this._token = 0;
+    this._scrollToSel = false;
+    this._retried = false;
     this.build();
   }
 
@@ -130,7 +137,7 @@ class PickerUI {
     this.pathEl.className = "fip-path empty";
     this.pathEl.textContent = "No folder selected";
 
-    bar.append(this.pickBtn, this.refreshBtn, this.recBtn, this.sizeBtn, this.pathEl);
+    bar.append(this.pickBtn, this.refreshBtn, this.recBtn, this.sizeBtn);
 
     this.crumbsEl = document.createElement("div");
     this.crumbsEl.className = "fip-crumbs";
@@ -146,9 +153,12 @@ class PickerUI {
     this.countEl = document.createElement("span");
     this.selEl = document.createElement("span");
     this.selEl.className = "fip-sel";
+    this.selEl.onclick = () => {
+      if (this.selected) this.locateSelection();
+    };
     this.statusEl.append(this.countEl, this.selEl);
 
-    this.root.append(bar, this.crumbsEl, this.chipsEl, this.gridEl, this.statusEl);
+    this.root.append(bar, this.pathEl, this.crumbsEl, this.chipsEl, this.gridEl, this.statusEl);
 
     this.widget = this.node.addDOMWidget("folderpicker", "div", this.root, {
       serialize: false,
@@ -173,6 +183,26 @@ class PickerUI {
     const idx = CELL_SIZES.indexOf(this.cellSize);
     this.cellSize = CELL_SIZES[(idx + 1) % CELL_SIZES.length];
     this.applyCellSize();
+  }
+
+  locateSelection() {
+    const sel = this.selected;
+    if (!sel) return;
+    this.rel = sel.includes("/") ? sel.slice(0, sel.lastIndexOf("/")) : "";
+    this._scrollToSel = true;
+    this.load();
+  }
+
+  scrollToSelection() {
+    const cell = this.gridEl.querySelector(".fip-cell.sel");
+    if (!cell) return;
+    this.gridEl.scrollTop = Math.max(
+      0,
+      cell.offsetTop - this.gridEl.clientHeight / 2 + cell.offsetHeight / 2
+    );
+    cell.classList.remove("flash");
+    void cell.offsetWidth;
+    cell.classList.add("flash");
   }
 
   async pickFolder() {
@@ -201,7 +231,14 @@ class PickerUI {
 
   async load() {
     const folder = this.folder;
-    this.pathEl.textContent = folder || "No folder selected";
+    if (folder) {
+      this.pathEl.textContent = "";
+      const t = document.createElement("span");
+      t.textContent = folder;
+      this.pathEl.append(t);
+    } else {
+      this.pathEl.textContent = "No folder selected";
+    }
     this.pathEl.classList.toggle("empty", !folder);
     this.pathEl.title = folder;
     if (!folder) {
@@ -226,10 +263,17 @@ class PickerUI {
       const data = await res.json();
       if (token !== this._token) return;
       if (data.error) {
+        if (this.rel && !this._retried) {
+          this._retried = true;
+          this.rel = "";
+          this.load();
+          return;
+        }
         this.gridEl.innerHTML = `<div class="fip-empty">Failed to load: ${data.error}</div>`;
         this.countEl.textContent = "";
         return;
       }
+      this._retried = false;
       this.render(data);
     } catch (e) {
       if (token !== this._token) return;
@@ -247,6 +291,10 @@ class PickerUI {
     this.renderGrid(data.images || []);
     this.countEl.textContent = `${data.count} image${data.count === 1 ? "" : "s"}`;
     this.renderSelection();
+    if (this._scrollToSel) {
+      this._scrollToSel = false;
+      requestAnimationFrame(() => this.scrollToSelection());
+    }
   }
 
   renderCrumbs() {
@@ -366,7 +414,8 @@ class PickerUI {
       }
     }
     this.selEl.textContent = sel ? `Selected: ${sel}` : "";
-    this.selEl.title = sel;
+    this.selEl.title = sel ? "Click to locate this image's folder" : "";
+    this.selEl.classList.toggle("link", !!sel);
   }
 }
 
@@ -398,7 +447,9 @@ app.registerExtension({
     nodeType.prototype.onConfigure = function () {
       const r = onConfigure?.apply(this, arguments);
       if (this.pickerUI) {
-        this.pickerUI.rel = "";
+        const sel = this.pickerUI.selected || "";
+        this.pickerUI.rel = sel.includes("/") ? sel.slice(0, sel.lastIndexOf("/")) : "";
+        this.pickerUI._scrollToSel = true;
         this.pickerUI.renderCrumbs();
         this.pickerUI.renderSelection();
         if (this.pickerUI.folder) this.pickerUI.load();

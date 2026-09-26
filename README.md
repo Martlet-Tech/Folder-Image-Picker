@@ -22,6 +22,7 @@ the picker opens where you expect.
 - **Inline thumbnail grid** — click a thumbnail to select; no dialog round-trip
 - **Recursive subfolders** — optional toggle that also lists images in nested subdirectories
 - **Breadcrumb navigation** — walk into subfolders and back out
+- **Reopens at the selection** — reloading a workflow opens the folder containing the selected image, scrolled to it; the "Selected: …" label is clickable to jump back at any time
 - **Native folder dialog** — modern Windows folder picker (opened at the node's current folder)
 - **Fixed-size cells** — thumbnails stay square when the node is resized; cycle 88 / 112 / 144 / 192 px
 - **Thumbnail cache** — 320 px WebP thumbnails, keyed by path and mtime, so edits invalidate automatically
@@ -54,6 +55,7 @@ Add the **Folder Image Picker** node (category `image`).
 3. Click a thumbnail to select it; click it again to clear the selection.
 4. Use the breadcrumb or the folder chips to navigate; **⟳** re-reads the directory.
 5. The size button cycles thumbnail size (88 / 112 / 144 / 192 px).
+6. The green **Selected: …** label in the corner is clickable — it jumps back to the folder containing the selected image and scrolls it into view. If that folder no longer exists, the picker falls back to the root.
 
 The selected image is exposed as an `IMAGE` output.
 
